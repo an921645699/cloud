@@ -5,38 +5,39 @@ void do_run(int c,char* cmd,char* myargv[])
     int fd[2];
     if( pipe(fd) == -1)
     {
-        printf("pipe err\n");
+        send(c,"pipe err",8,0);
         return ;
     }
 
     pid_t pid = fork();
     if(pid == -1)
     {
-        printf("fork err\n");
+        send(c,"fork err",8,0);
     }
     if(pid == 0)
     {
         close(fd[0]);
-        dup(fd[1],1);
-        dup(fd[1],2);
+        dup2(fd[1],1);
+        dup2(fd[1],2);
         
         execvp(cmd,myargv);
         printf("exec err\n");
         exit(0);
     }
     close(fd[1]);
-    char read_buff[1024] = "ok#";
-    read(fd[0],read_buff,sizeof(read_buff),0);
-    send(c,read_buff,strlen(read_buff),0);
+    wait(NULL);
+    char read_buff[READ_BUFF] = "ok#";
+    read(fd[0],read_buff+3,READ_BUFF-4);
     close(fd[0]);
 
+    send(c,read_buff,strlen(read_buff),0);
 }
 
 
 void* thread_work(void* arg)
 {
     int c = (int)arg;
-    
+     
     while(1)
     {
         char buff[128] = {0};
@@ -54,9 +55,11 @@ void* thread_work(void* arg)
         }
         else if( strcmp(cmd,"get") == 0)
         {
+            //下载
         }
         else if( strcmp(cmd,"up") == 0)
         {
+            //上传
         }
         else
         {
@@ -66,8 +69,6 @@ void* thread_work(void* arg)
     close(c);
 }
 
-
-
 char* get_cmd(char buff[],char* myargv[])
 {
     if(buff == NULL || myargv == NULL)
@@ -75,7 +76,7 @@ char* get_cmd(char buff[],char* myargv[])
 
     int index = 0;
     char * str = NULL;
-    char* s=strtok_r(buff," ",&ptr);
+    char* s=strtok_r(buff," ",&str);
     while( s != NULL)
     {
         myargv[index++] = s;
