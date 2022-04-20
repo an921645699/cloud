@@ -7,6 +7,7 @@
 #include<sys/socket.h>
 #include<arpa/inet.h>
 #include<sys/wait.h>
+#include<fcntl.h>
 
 #define READ_BUFF 1024
 #define ARG_MAX 10

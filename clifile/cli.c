@@ -42,8 +42,8 @@ int main()
         strcpy(send_buff,buff);
         
         char* myargv[10] = {0};
-        char cmd = get_cmd(buff,myargv);
-
+        char* cmd = get_cmd(buff,myargv);
+        
         if( cmd == NULL)
             continue;
 
@@ -60,20 +60,20 @@ int main()
         }
         else
         {        
-            send(sockfd,send_buff,strlen(buff),0);
-            memset(send_buff,0,128);
-            if( recv(sockfd,send_buff,127,0)<=0)
+            send(sockfd,send_buff,strlen(send_buff),0);
+            char* rbuff[128] = {0};
+            if( recv(sockfd,rbuff,127,0)<=0)
             {
                 printf("ser close\n");
                 break;
             }
-            if( strncmp(send_buff,"ok#",3) == 0)
+            if( strncmp(rbuff,"ok#",3) == 0)
             {
-                printf("%s\n",send_buff+3);
+                printf("%s\n",rbuff+3);
             }
             else
             {
-                printf("服务器错误:%s\n",send_buff);
+                printf("服务器错误:%s\n",rbuff);
             }
         }
     }

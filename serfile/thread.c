@@ -13,6 +13,7 @@ void do_run(int c,char* cmd,char* myargv[])
     if(pid == -1)
     {
         send(c,"fork err",8,0);
+        return ;
     }
     if(pid == 0)
     {
@@ -33,6 +34,39 @@ void do_run(int c,char* cmd,char* myargv[])
     send(c,read_buff,strlen(read_buff),0);
 }
 
+void send_file(int c,char* filename)
+{
+    if(filename == NULL){
+        send(c,"err",3,0);
+        return ;
+    }
+
+    int fd = open(filename,O_RDONLY);
+    if(fd == -1){
+        send(c,"err",3,0);
+        return ;
+    }
+
+    int filesize = lseek(fd,0,SEEK_END);
+    lseek(fd,0,SEEK_SET);
+
+    char status[64] = {0};
+    sprintf(status,"ok#%d",filesize);
+    printf("status:&s\n",status);
+    send(c,status,strlen(status),0);
+
+    memset(status,0,64);
+
+    int num = recv(c,status,63,0);
+    if(num <=0 || strncmp(status,"ok",2) != 0){     
+        return ;
+    }
+    
+    while(read(fd,status,64)){
+        send(c,status,64,0);
+    }
+    
+}
 
 void* thread_work(void* arg)
 {
@@ -45,8 +79,8 @@ void* thread_work(void* arg)
         if(n < 0)
             break;
             
-        char myargv[ARG_MAX] = {0};
-        char cmd = get_cmd(buff,myargv);
+        char* myargv[ARG_MAX] = {0};
+        char* cmd = get_cmd(buff,myargv);
 
         if( cmd == NULL)
         {
@@ -55,7 +89,7 @@ void* thread_work(void* arg)
         }
         else if( strcmp(cmd,"get") == 0)
         {
-            //下载
+            send_file(c,myargv);
         }
         else if( strcmp(cmd,"up") == 0)
         {
