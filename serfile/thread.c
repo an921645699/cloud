@@ -37,35 +37,61 @@ void do_run(int c,char* cmd,char* myargv[])
 void send_file(int c,char* filename)
 {
     if(filename == NULL){
-        send(c,"err",3,0);
+        send(c,"get err",7,0);
         return ;
     }
 
     int fd = open(filename,O_RDONLY);
     if(fd == -1){
-        send(c,"err",3,0);
+        send(c,"get err",7,0);
         return ;
     }
 
     int filesize = lseek(fd,0,SEEK_END);
     lseek(fd,0,SEEK_SET);
 
-    char status[64] = {0};
+    char status[32] = {0};
     sprintf(status,"ok#%d",filesize);
-    printf("status:&s\n",status);
     send(c,status,strlen(status),0);
+    memset(status,0,32);
 
-    memset(status,0,64);
-
-    int num = recv(c,status,63,0);
+    int num = recv(c,status,31,0);
     if(num <=0 || strncmp(status,"ok",2) != 0){     
         return ;
     }
-    
-    while(read(fd,status,64)){
-        send(c,status,64,0);
+
+    int n =0;
+    char buff[1024];
+    if(num > 2)
+    {
+        read(fd,buff,8);
+        if(strncmp(buff,status+2,8)==0)
+        {
+            send(c,"yes",3,0);
+            memset(status,0,32);
+            if(recv(c,status,31,0)<=0)
+            {
+                printf("cli(%d) close\n",c);
+                return;
+            }
+            if(strncmp(status,"ok",2) == 0)
+            {
+                status[strlen(status)-1] = 0;
+                int namesize = atoi(status+2);
+                lseek(fd,namesize,SEEK_SET);
+                while((n = read(fd,buff,1024)) > 0){
+                    send(c,buff,n,0);
+                }
+                close(fd);
+                return ;
+            }
+        }
+    }
+    while((n = read(fd,buff,1024)) > 0){
+        send(c,buff,n,0);
     }
     
+    close(fd);
 }
 
 void* thread_work(void* arg)
@@ -76,9 +102,10 @@ void* thread_work(void* arg)
     {
         char buff[128] = {0};
         int n = recv(c,buff,127,0);
-        if(n < 0)
+        if(n <= 0){
             break;
-            
+        }
+
         char* myargv[ARG_MAX] = {0};
         char* cmd = get_cmd(buff,myargv);
 
@@ -89,7 +116,7 @@ void* thread_work(void* arg)
         }
         else if( strcmp(cmd,"get") == 0)
         {
-            send_file(c,myargv);
+            send_file(c,myargv[1]);
         }
         else if( strcmp(cmd,"up") == 0)
         {
@@ -100,6 +127,7 @@ void* thread_work(void* arg)
             do_run(c,cmd,myargv);            
         }
     }
+    printf("cli(%d) close\n",c);
     close(c);
 }
 
