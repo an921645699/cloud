@@ -6,13 +6,17 @@
 #include<sys/socket.h>
 #include<arpa/inet.h>
 #include<netinet/in.h>
+#include<openssl/md5.h>
+
+#define  MD5_LEN  16 
+#define  BUFF_SIZE 1024*16
 
 int socket_create();
 char* get_cmd(char buff[],char* myargv[])
 {
     if(buff == NULL || myargv == NULL)
         return NULL;
-
+ 
     int index = 0;
     char *s = strtok(buff," ");
     while( s != NULL)
@@ -22,6 +26,38 @@ char* get_cmd(char buff[],char* myargv[])
     }
 
     return myargv[0];
+}
+
+void print_md5(unsigned char md[])
+{
+    
+
+    printf("\n");
+}
+
+char* fun_md5(int fd,int slen)
+{
+    MD5_CTX ctx;
+    unsigned char md[MD5_LEN] = {0};
+    MD5_Init(&ctx);
+
+    unsigned long len = 0;
+    char buff[ BUFF_SIZE ];
+    while( (len = read(fd,buff,BUFF_SIZE )) > 0 )
+    {
+        MD5_Update(&ctx,buff,len);
+    }
+    MD5_Final(md,&ctx);
+    char tmp[3]={'\0'};
+    char buf[64]={'\0'};
+    sprintf(buf,"ok%d#",slen);
+    for(int i = 0; i < MD5_LEN; i++ )
+    {
+        sprintf(tmp,"%02X",md[i]);
+        strcat(buf,tmp);
+    }
+    sprintf(tmp,"#");
+    return buf;
 }
 
 void recv_file(int c,char* name,char* send_buff)
@@ -48,7 +84,7 @@ void recv_file(int c,char* name,char* send_buff)
     int filesize = atoi(status+3);
     printf("file:%s filesie:%d \n",name,filesize);
 
-    printf("确认下载 %s 请回复y/Y，否则按任意键取消下载\n",name);
+    printf("确认下载 %s 请回复y/Y,否则按任意键取消下载\n",name);
     char yn;
     scanf("%c",&yn);
     if(yn != 'y'&&yn!='Y')
@@ -64,37 +100,34 @@ void recv_file(int c,char* name,char* send_buff)
         send(c,"err",3,0);
         return ;
     }
-    int namesize = lseek(fd,0,SEEK_END);
-    lseek(fd,0,SEEK_SET);
-
+    
     int num = 0;
     int curr_size = 0;
     char rbuff[1024] = {0};
-    if(namesize != 0)
+    
+    int namesize = lseek(fd,0,SEEK_END);
+    lseek(fd,0,SEEK_SET);
+
+    if( namesize > 0 )
     {
-        char sbuff[10] = {0};
-        strcpy(sbuff,"ok"); 
-        read(fd,sbuff+2,8);
-        send(c,sbuff,strlen(sbuff),0);
-        memset(sbuff,0,10);
-        if(recv(c,sbuff,9,0)<=0)
+        char* md = fun_md5(fd,namesize);
+        send(c,md,strlen(md),0);
+        
+        if(recv(c,status,31,0) <= 0)
         {
-            send(c,"err",3,0);
+            printf("ser close\n");
             return ;
         }
-        if(strncmp(sbuff,"yes",3) == 0)
+        if(strncmp(status,"2",2) == 0)
         {
-            memset(sbuff,0,10);
-            sprintf(sbuff,"ok%d",namesize);
-            send(c,sbuff,strlen(sbuff),0);
-            memset(rbuff,0,1024);
             curr_size = namesize;
             while(1)
             {
-                num = recv(c,rbuff,1024,0);
+                lseek(fd,namesize,SEEK_SET);
+                num=recv(c,rbuff,1024,0);
                 write(fd,rbuff,num);
                 curr_size += num;
-
+        
                 double f = curr_size*100/filesize;
                 printf("下载%.2lf%%\r",f);
                 if(curr_size>=filesize)
@@ -102,28 +135,55 @@ void recv_file(int c,char* name,char* send_buff)
                     break;
                 }
             }
-            printf("\n");
-            close(fd);
-            return;
         }
-    }
-    send(c,"ok",2,0);
-    while(1)
-    {
-        num=recv(c,rbuff,1024,0);
-        write(fd,rbuff,num);
-        curr_size += num;
-        
-        double f = curr_size*100/filesize;
-        printf("下载%.2lf%%\r",f);
-        if(curr_size>=filesize)
+        else
         {
-            break;
+            while(1)
+            {
+                num=recv(c,rbuff,1024,0);
+                write(fd,rbuff,num);
+                curr_size += num;
+        
+                double f = curr_size*100/filesize;
+                printf("下载%.2lf%%\r",f);
+                if(curr_size>=filesize)
+                {
+                    break;
+                }
+            }
         }
     }
-
+    else
+    {
+        send(c,"ok",2,0);
+        while(1)
+        {
+            num=recv(c,rbuff,1024,0);
+            write(fd,rbuff,num);
+            curr_size += num;
+        
+            double f = curr_size*100/filesize;
+            printf("下载%.2lf%%\r",f);
+            if(curr_size>=filesize)
+            {
+                break;
+            }
+        }
+    }
     printf("\n");
     close(fd);
+    return;
+}
+
+void send_file(int c,char* name,char* send_buff)
+{
+    if(name == NULL||send_buff == NULL)
+    {
+        return ;
+    }
+    send(c,send_buff,strlen(send_buff),0);
+
+    
 }
 
 int main()
@@ -162,6 +222,7 @@ int main()
         }
         else if( strcmp(cmd,"up") == 0)
         {
+            //send_file(sockfd,myargv[1],send_buff);
         }
         else if( strcmp(cmd,"ls") == 0 || strcmp(cmd,"rm") == 0||
                 strcmp(cmd,"touch") == 0||strcmp(cmd,"mkdir") == 0||

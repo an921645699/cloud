@@ -1,7 +1,7 @@
 all : ser
 
 ser : ser.o socket.o thread.o
-	gcc -o ser ser.o socket.o thread.o -lpthread
+	gcc -o ser ser.o socket.o thread.o -lpthread -lcrypto
 
 ser.o : ser.c 
 	gcc -c ser.c -g 
