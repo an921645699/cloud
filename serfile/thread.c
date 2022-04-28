@@ -58,7 +58,7 @@ char* fun_md5(int fd,int slen)
     }
     return buf;
 }
-
+//发送
 void send_file(int c,char* filename)
 {
     if(filename == NULL){
@@ -82,7 +82,7 @@ void send_file(int c,char* filename)
 
     int num = recv(c,status,63,0);
     int n =0;
-    char buff[1024];
+    char buff[1024] = {0};
     if(num <=0 || strncmp(status,"ok",2) != 0){     
         return ;
     }
@@ -114,10 +114,43 @@ void send_file(int c,char* filename)
     
     close(fd);
 }
-
+//接收
 void secv_file(int c,char* filename)
 {
+    if(filename == NULL)
+    {
+        send(c,"up err",7,0);
+        return ;
+    }
+
+    int fd = open(filename,O_WRONLY|O_CREAT,0600);
+    if(fd == -1)
+    {
+        send(c,"up err",7,0);
+        return ;
+    }
+    send(c,"ok",2,0);
+    char status[32] = {0};
+    if(recv(c,status,31,0)<0)
+    {
+        return ;
+    }
+    int len = atoi(status);
+    send(c,"ok",2,0);
     
+    int num = 0,n = 0;
+    char rbuff[1024] = {0};
+    while(1)
+    {
+        n = recv(c,rbuff,1024,0);
+        write(fd,rbuff,n);
+        num += n;
+        if(num>=len)
+        {
+            break;
+        }
+    }
+    close(fd);  
 }
 
 void* thread_work(void* arg)
@@ -146,7 +179,7 @@ void* thread_work(void* arg)
         }
         else if( strcmp(cmd,"up") == 0)
         {
-            //上传
+            secv_file(c,myargv[1]);
         }
         else
         {

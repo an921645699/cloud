@@ -59,7 +59,7 @@ char* fun_md5(int fd,int slen)
     sprintf(tmp,"#");
     return buf;
 }
-
+//下载
 void recv_file(int c,char* name,char* send_buff)
 {
     if(name == NULL||send_buff == NULL)
@@ -174,15 +174,75 @@ void recv_file(int c,char* name,char* send_buff)
     close(fd);
     return;
 }
-
+//上传
 void send_file(int c,char* name,char* send_buff)
 {
     if(name == NULL||send_buff == NULL)
     {
         return ;
     }
-    send(c,send_buff,strlen(send_buff),0);
+ 
+    int fd = open(name,O_RDONLY);
+    if(fd == -1){
+        return ;
+    }
+    int filesize = lseek(fd,0,SEEK_END);
+    lseek(fd,0,SEEK_SET);
+    if(filesize==0){
+        printf("没有该文件(空)\n");
+        return ;
+    }
 
+    printf("file:%s filesie:%d \n",name,filesize);
+    printf("确认上传 %s 请回复y/Y,否则按任意键取消上传\n",name);
+    char yn;
+    scanf("%c",&yn);
+    if(yn != 'y'&&yn!='Y')
+    {
+        printf("已取消上传\n");
+        send(c,"err",3,0);
+        return ;
+    }
+    
+    send(c,send_buff,strlen(send_buff),0);
+    char status[32] = {0};
+    if(recv(c,status,31,0)<=0)
+    {
+        printf("ser close\n");
+        return ;
+    }
+    if(strncmp(status,"ok",2) != 0)
+    {
+        printf("ser err\n");
+        return ;
+    }
+    memset(status,0,32);
+    sprintf(status, "%d", filesize);
+    send(c,status,32,0);
+    if(recv(c,status,31,0)<=0)
+    {
+        printf("ser close\n");
+        return ;
+    }
+    if(strncmp(status,"ok",2) != 0)
+    {
+        printf("ser err\n");
+        return ;
+    }
+
+    int n =0;
+    int curr_size = 0;
+    char rbuff[1024] = {0};
+    while((n = read(fd,rbuff,1024)) > 0){
+        send(c,rbuff,n,0);
+        curr_size += n;
+        
+        double f = curr_size*100/filesize;
+        printf("上传%.2lf%%\r",f);
+    }
+    printf("\n");
+    close(fd);
+    return;
     
 }
 
@@ -222,7 +282,7 @@ int main()
         }
         else if( strcmp(cmd,"up") == 0)
         {
-            //send_file(sockfd,myargv[1],send_buff);
+            send_file(sockfd,myargv[1],send_buff);
         }
         else if( strcmp(cmd,"ls") == 0 || strcmp(cmd,"rm") == 0||
                 strcmp(cmd,"touch") == 0||strcmp(cmd,"mkdir") == 0||
