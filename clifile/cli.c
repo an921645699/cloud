@@ -195,9 +195,10 @@ void send_file(int c,char* name,char* send_buff)
 
     printf("file:%s filesie:%d \n",name,filesize);
     printf("确认上传 %s 请回复y/Y,否则按任意键取消上传\n",name);
-    char yn;
-    scanf("%c",&yn);
-    if(yn != 'y'&&yn!='Y')
+    char yn[8];
+    //scanf("%c",&yn);
+    fgets(yn,8,stdin);
+    if(yn[0] != 'y'&&yn[0]!='Y')
     {
         printf("已取消上传\n");
         send(c,"err",3,0);
@@ -218,7 +219,7 @@ void send_file(int c,char* name,char* send_buff)
     }
     memset(status,0,32);
     sprintf(status, "%d", filesize);
-    send(c,status,32,0);
+    send(c,status,strlen(status),0);
     if(recv(c,status,31,0)<=0)
     {
         printf("ser close\n");
