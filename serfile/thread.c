@@ -36,27 +36,27 @@ void do_run(int c,char* cmd,char* myargv[])
     send(c,read_buff,strlen(read_buff),0);
 }
 
-char* fun_md5(int fd,int slen)
+void fun_md5(int fd,int slen,char buf[])
 {
     MD5_CTX ctx;
     unsigned char md[MD5_LEN] = {0};
     MD5_Init(&ctx);
 
-    unsigned long len = 0;
-    char buff[ slen+1 ];
-    if(slen != read(fd,buff,slen )){
-        return -1;
-    }
+    long len = 0;
+    char buff[ slen + 1 ];
+
+    while( (len = read(fd,buff,slen-1 )) < 0 )
+    {}
     MD5_Update(&ctx,buff,slen);
     MD5_Final(md,&ctx);
-    char tmp[3]={'\0'};
-    char buf[64]={'\0'};
-    for(int i = 0; i < MD5_LEN; i++ )
-    {
-        sprintf(tmp,"%02X",md[i]);
-        strcat(buf,tmp);
+
+    char bf[3] = {0};
+    for(int i = 0; i < MD5_LEN; i++ ){
+        sprintf(bf,"%02x",md[i]);
+        strncat(buf,bf,2);
     }
-    return buf;
+
+    return ;
 }
 //发送
 void send_file(int c,char* filename)
@@ -84,16 +84,20 @@ void send_file(int c,char* filename)
     int n =0;
     char buff[1024] = {0};
     if(num <=0 || strncmp(status,"ok",2) != 0){     
+        send(c,"err",3,0);
         return ;
     }
-    else if(num>2){
+    if(num>2){
         char* s = strtok(status+2,"#");
+
         int slen = atoi(s);
         s = strtok(NULL,"#");
-        char* md = fun_md5(fd,slen);
-        md[strlen(md)-1] = 0;
-        if(strcmp(md,s)==0){
+        char md[64] = {0};
+        fun_md5(fd,slen,md);
+        if(strncmp(md,s,32) == 0){
+
             send(c,"ok",2,0);
+            recv(c,status,31,0);
             lseek(fd,slen,SEEK_SET);
             while((n = read(fd,buff,1024)) > 0){
                 send(c,buff,n,0);
@@ -101,6 +105,8 @@ void send_file(int c,char* filename)
         }
         else{
             send(c,"err",3,0);
+            recv(c,status,31,0);
+            lseek(fd,0,SEEK_SET);
             while((n = read(fd,buff,1024)) > 0){
                 send(c,buff,n,0);
             }
@@ -114,6 +120,7 @@ void send_file(int c,char* filename)
     
     close(fd);
 }
+
 //接收
 void secv_file(int c,char* filename)
 {

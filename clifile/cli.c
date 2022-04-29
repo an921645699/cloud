@@ -28,36 +28,27 @@ char* get_cmd(char buff[],char* myargv[])
     return myargv[0];
 }
 
-void print_md5(unsigned char md[])
-{
-    
-
-    printf("\n");
-}
-
-char* fun_md5(int fd,int slen)
+void fun_md5(int fd,int slen,char buf[])
 {
     MD5_CTX ctx;
     unsigned char md[MD5_LEN] = {0};
     MD5_Init(&ctx);
 
-    unsigned long len = 0;
+    long len = 0;
     char buff[ BUFF_SIZE ];
     while( (len = read(fd,buff,BUFF_SIZE )) > 0 )
     {
         MD5_Update(&ctx,buff,len);
     }
     MD5_Final(md,&ctx);
-    char tmp[3]={'\0'};
-    char buf[64]={'\0'};
+    char bf[3] = {0};
     sprintf(buf,"ok%d#",slen);
-    for(int i = 0; i < MD5_LEN; i++ )
-    {
-        sprintf(tmp,"%02X",md[i]);
-        strcat(buf,tmp);
+    for(int i = 0; i < MD5_LEN; i++ ){
+        sprintf(bf,"%02x",md[i]);
+        strncat(buf,bf,2);
     }
-    sprintf(tmp,"#");
-    return buf;
+    strcat(buf,"#");
+    return ;
 }
 //下载
 void recv_file(int c,char* name,char* send_buff)
@@ -85,9 +76,9 @@ void recv_file(int c,char* name,char* send_buff)
     printf("file:%s filesie:%d \n",name,filesize);
 
     printf("确认下载 %s 请回复y/Y,否则按任意键取消下载\n",name);
-    char yn;
-    scanf("%c",&yn);
-    if(yn != 'y'&&yn!='Y')
+    char yn[8];
+    fgets(yn,8,stdin);
+    if(yn[0] != 'y'&&yn[0]!='Y')
     {
         printf("已取消下载\n");
         send(c,"err",3,0);
@@ -110,20 +101,22 @@ void recv_file(int c,char* name,char* send_buff)
 
     if( namesize > 0 )
     {
-        char* md = fun_md5(fd,namesize);
+
+        char md[64] = {0};
+        fun_md5(fd,namesize,md);
         send(c,md,strlen(md),0);
-        
         if(recv(c,status,31,0) <= 0)
         {
             printf("ser close\n");
             return ;
         }
-        if(strncmp(status,"2",2) == 0)
+        if(strncmp(status,"ok",2) == 0)
         {
+            send(c,"ok",2,0);
             curr_size = namesize;
+            lseek(fd,namesize,SEEK_SET);
             while(1)
             {
-                lseek(fd,namesize,SEEK_SET);
                 num=recv(c,rbuff,1024,0);
                 write(fd,rbuff,num);
                 curr_size += num;
@@ -138,6 +131,9 @@ void recv_file(int c,char* name,char* send_buff)
         }
         else
         {
+            
+            send(c,"ok",2,0);
+            lseek(fd,0,SEEK_SET);
             while(1)
             {
                 num=recv(c,rbuff,1024,0);
